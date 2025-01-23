@@ -1,0 +1,18 @@
+[Unit]
+Description=Kubernetes Kubelet
+After=docker.service
+Wants=docker.service
+
+[Service]
+ExecStart=/usr/bin/kubelet \
+    --bootstrap-kubeconfig=/etc/kubernetes/bootstrap-config.yaml \
+    --kubeconfig=/etc/kubernetes/kubelet.conf \
+    --address={{ ansible_default_ipv4.address }} \
+    --allow-privileged=true \
+    --cgroup-driver=systemd \
+    --network-plugin=cni \
+    --pod-infra-container-image=k8s.gcr.io/pause:3.7 \
+    --volume-plugin-dir=/usr/libexec/kubernetes/kubelet-plugins/volume/exec
+
+[Install]
+WantedBy=multi-user.target

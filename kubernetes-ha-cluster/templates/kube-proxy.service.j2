@@ -1,0 +1,13 @@
+[Unit]
+Description=Kubernetes Kube-Proxy
+After=docker.service
+Wants=docker.service
+
+[Service]
+ExecStart=/usr/local/bin/kube-proxy \
+    --proxy-mode=iptables \
+    --master=https://{{ haproxy_vip }}:6443 \
+    --kubeconfig=/etc/kubernetes/kube-proxy.conf
+
+[Install]
+WantedBy=multi-user.target

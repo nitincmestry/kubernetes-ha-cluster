@@ -1,0 +1,30 @@
+global
+    log 127.0.0.1 local2
+    log 127.0.0.1 local2 notice
+    user haproxy
+    group haproxy
+    daemon
+
+defaults
+    log     global
+    mode    http
+    option httplog
+    option dontlognull
+    retries 3
+    option redispatch
+    maxconn 3000
+
+frontend kubernetes
+    bind *:6443
+    mode tcp
+    option tcplog
+    balance roundrobin
+    server master1 {{ ansible_default_ipv4.address }}:6443 check
+    server master2 {{ groups['kubernetes_masters'][1].ansible_default_ipv4.address }}:6443 check
+
+backend kubernetes
+    mode tcp
+    option tcplog
+    balance roundrobin
+    server master1 {{ ansible_default_ipv4.address }}:6443 check
+    server master2 {{ groups['kubernetes_masters'][1].ansible_default_ipv4.address }}:6443 check

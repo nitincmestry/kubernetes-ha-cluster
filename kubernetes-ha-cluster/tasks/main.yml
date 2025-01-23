@@ -1,0 +1,78 @@
+---
+- hosts: kubernetes_masters
+  become: true
+  tasks:
+    - name: Install required packages
+      yum:
+        name:
+          - docker.io
+          - kubeadm
+          - kubelet
+          - kubectl
+        state: present
+
+    - name: Start and enable docker service
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Initialize Kubernetes master node
+      command: kubeadm init --apiserver-advertise-address={{ ansible_default_ipv4.address }} --pod-network-cidr=10.244.0.0/16 --control-plane-endpoint={{ ansible_default_ipv4.address }}:6443 
+      register: kubeadm_init
+
+    - name: Save admin.conf
+      copy:
+        content: "{{ kubeadm_init.stdout }}"
+        dest: /etc/kubernetes/admin.conf
+
+    - name: Join nodes to the cluster
+      become: false
+      script: kubectl join {{ ansible_default_ipv4.address }}:6443 --token=$(kubectl token create --print-join-command | awk '{print $9}') --discovery-token-ca-cert-hash=$(kubectl token create --print-join-command | awk '{print $17}') 
+      delegate_to: "{{ item }}"
+      with_items: "{{ groups['kubernetes_nodes'] }}"
+
+    - name: Configure kubelet service
+      template:
+        src: templates/kubelet.service.j2
+        dest: /etc/systemd/system/kubelet.service
+      notify: restart kubelet
+
+    - name: Configure kube-proxy service
+      template:
+        src: templates/kube-proxy.service.j2
+        dest: /etc/systemd/system/kube-proxy.service
+      notify: restart kube-proxy
+
+- hosts: haproxy_server
+  become: true
+  tasks:
+    - name: Install haproxy
+      yum:
+        name: haproxy
+        state: present
+
+    - name: Configure haproxy
+      template:
+        src: templates/haproxy.cfg.j2
+        dest: /etc/haproxy/haproxy.cfg
+
+    - name: Reload haproxy
+      service:
+        name: haproxy
+        state: reloaded
+
+- hosts: kubernetes_nodes
+  become: true
+  tasks:
+    - name: Configure kubelet service
+      template:
+        src: templates/kubelet.service.j2
+        dest: /etc/systemd/system/kubelet.service
+      notify: restart kubelet
+
+    - name: Configure kube-proxy service
+      template:
+        src: templates/kube-proxy.service.j2
+        dest: /etc/systemd/system/kube-proxy.service
+      notify: restart kube-proxy
